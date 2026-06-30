@@ -7,11 +7,10 @@ on:
   # Allow manually re-running the deploy from the Actions tab
   workflow_dispatch:
 
-# Permissions the GITHUB_TOKEN needs to publish to Pages
+# Least privilege by default: every job starts read-only and only the
+# job that needs more is granted it below.
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 # Only one Pages deploy at a time; cancel older in-progress runs
 concurrency:
@@ -21,12 +20,20 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: read # configure-pages reads the Pages site config
     steps:
+      # Actions are pinned to a full commit SHA (the version tag is in the
+      # comment) to prevent a hijacked/moved tag from running new code.
+      # Dependabot (.github/dependabot.yml) keeps these SHAs up to date.
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 20
           cache: npm
@@ -38,24 +45,23 @@ jobs:
         run: npm run build
 
       - name: Configure Pages
-        uses: actions/configure-pages@v5
-        with:
-          # Auto-enable Pages (build_type=workflow) on the first run so the
-          # initial deploy doesn't fail before Pages is turned on manually.
-          enablement: true
+        uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
 
       - name: Upload build artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
         with:
           path: dist
 
   deploy:
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      pages: write # deploy the artifact to Pages
+      id-token: write # OIDC token for the official deploy action
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
